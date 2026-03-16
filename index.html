@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reel Tail - Animated QR Video Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700&display=swap');
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #020617;
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            overflow-x: hidden;
+        }
+
+        .glass {
+            background: rgba(15, 23, 42, 0.7);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .upload-zone {
+            border: 2px dashed rgba(71, 85, 105, 0.4);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            aspect-ratio: 1.5/1;
+        }
+
+        .upload-zone:hover {
+            border-color: #3b82f6;
+            background: rgba(59, 130, 246, 0.05);
+        }
+
+        /* 9:16 Preview Container */
+        .preview-9-16 {
+            aspect-ratio: 9/16;
+            width: 100%;
+            max-width: 320px;
+            background: #000;
+            border-radius: 1.5rem;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        #recordingOverlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(2, 6, 23, 0.95);
+            z-index: 100;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .loader {
+            width: 48px;
+            height: 48px;
+            border: 5px solid #FFF;
+            border-bottom-color: #3b82f6;
+            border-radius: 50%;
+            display: inline-block;
+            box-sizing: border-box;
+            animation: rotation 1s linear infinite;
+        }
+
+        @keyframes rotation {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Background Decor -->
+    <div class="fixed inset-0 pointer-events-none overflow-hidden">
+        <div class="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-blue-600/10 rounded-full blur-[120px]"></div>
+        <div class="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-emerald-600/10 rounded-full blur-[120px]"></div>
+    </div>
+
+    <div class="w-full max-w-5xl grid lg:grid-cols-2 gap-8 items-start relative z-10">
+        
+        <!-- LEFT: SETUP FORM -->
+        <div class="glass rounded-[2.5rem] p-8 shadow-2xl order-2 lg:order-1">
+            <header class="mb-8">
+                <h1 class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-emerald-400">Motion QR Studio</h1>
+                <p class="text-slate-400 mt-2 text-sm uppercase tracking-widest font-semibold">Generate Animated 9:16 Reels</p>
+            </header>
+
+            <div class="space-y-6">
+                <!-- Site QR -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2 block">1. Website QR</label>
+                        <input type="file" id="siteInput" class="hidden" accept="image/*">
+                        <div onclick="document.getElementById('siteInput').click()" class="upload-zone rounded-3xl flex flex-col items-center justify-center cursor-pointer p-4 group overflow-hidden">
+                            <img id="siteThumb" class="hidden w-full h-full object-contain rounded-xl">
+                            <div id="sitePlaceholder" class="flex flex-col items-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-slate-500 group-hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2 block">2. WhatsApp QR</label>
+                        <input type="file" id="waInput" class="hidden" accept="image/*">
+                        <div onclick="document.getElementById('waInput').click()" class="upload-zone rounded-3xl flex flex-col items-center justify-center cursor-pointer p-4 group overflow-hidden">
+                            <img id="waThumb" class="hidden w-full h-full object-contain rounded-xl">
+                            <div id="waPlaceholder" class="flex flex-col items-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-slate-500 group-hover:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Number -->
+                <div class="space-y-2">
+                    <label class="text-[10px] font-bold uppercase tracking-widest text-slate-500 block ml-1">3. Contact Number</label>
+                    <input type="text" id="waNumber" placeholder="+1 (234) 567-890" class="w-full bg-slate-900 border border-slate-700 rounded-2xl py-4 px-5 focus:outline-none focus:border-blue-500 text-white transition-all">
+                </div>
+
+                <!-- Colors -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-bold uppercase tracking-widest text-slate-500 block ml-1">Primary Color</label>
+                        <input type="color" id="primaryColor" value="#3b82f6" class="w-full h-12 rounded-xl bg-slate-900 border border-slate-700 p-1 cursor-pointer">
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-bold uppercase tracking-widest text-slate-500 block ml-1">Accent Color</label>
+                        <input type="color" id="accentColor" value="#10b981" class="w-full h-12 rounded-xl bg-slate-900 border border-slate-700 p-1 cursor-pointer">
+                    </div>
+                </div>
+
+                <button id="recordBtn" class="w-full py-5 rounded-2xl font-bold bg-gradient-to-r from-blue-600 to-emerald-600 hover:scale-[1.02] active:scale-[0.98] shadow-xl shadow-blue-500/20 transition-all flex items-center justify-center gap-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                    Export Animated Reel
+                </button>
+            </div>
+        </div>
+
+        <!-- RIGHT: LIVE PREVIEW -->
+        <div class="flex flex-col items-center justify-center order-1 lg:order-2">
+            <span class="text-xs font-bold uppercase tracking-widest text-slate-500 mb-4 flex items-center gap-2">
+                <span class="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                9:16 Motion Preview
+            </span>
+            <div class="preview-9-16 border border-slate-800" id="posterPreview">
+                <canvas id="mainCanvas" width="1080" height="1920"></canvas>
+            </div>
+            <p class="mt-4 text-[10px] text-slate-500 text-center max-w-[280px]">Animation loops every 5 seconds. Use the export button to save as video.</p>
+        </div>
+    </div>
+
+    <!-- EXPORT OVERLAY -->
+    <div id="recordingOverlay">
+        <span class="loader mb-6"></span>
+        <h2 class="text-2xl font-bold mb-2">Generating Video...</h2>
+        <p class="text-slate-400 text-sm">Please keep this tab open. Recording 5s of animation.</p>
+        <div class="mt-8 w-64 h-2 bg-slate-800 rounded-full overflow-hidden">
+            <div id="recordProgress" class="h-full bg-blue-500 transition-all duration-300 w-0"></div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('mainCanvas');
+        const ctx = canvas.getContext('2d');
+        const state = {
+            siteImg: null,
+            waImg: null,
+            number: "YOUR NUMBER HERE",
+            primary: "#3b82f6",
+            accent: "#10b981",
+            startTime: Date.now()
+        };
+
+        // Inputs
+        document.getElementById('siteInput').addEventListener('change', (e) => handleUpload(e, 'siteImg', 'siteThumb', 'sitePlaceholder'));
+        document.getElementById('waInput').addEventListener('change', (e) => handleUpload(e, 'waImg', 'waThumb', 'waPlaceholder'));
+        document.getElementById('waNumber').addEventListener('input', (e) => state.number = e.target.value.toUpperCase());
+        document.getElementById('primaryColor').addEventListener('input', (e) => state.primary = e.target.value);
+        document.getElementById('accentColor').addEventListener('input', (e) => state.accent = e.target.value);
+
+        function handleUpload(e, key, thumbId, placeholderId) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        state[key] = img;
+                        document.getElementById(thumbId).src = event.target.result;
+                        document.getElementById(thumbId).classList.remove('hidden');
+                        document.getElementById(placeholderId).classList.add('hidden');
+                    };
+                    img.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        // Animation Loop
+        function animate() {
+            const time = (Date.now() - state.startTime) / 1000;
+            const cycle = time % 5; // 5 second animation loop
+
+            // 1. Draw Background (Animated Gradients)
+            drawBackground(ctx, time);
+
+            // 2. Title Animation (Slide + Fade)
+            const titleY = 300 - Math.min(1, cycle * 2) * 50;
+            const titleOpacity = Math.min(1, cycle * 2);
+            ctx.globalAlpha = titleOpacity;
+            ctx.textAlign = 'center';
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold 80px Plus Jakarta Sans';
+            ctx.fillText('CONNECT WITH US', canvas.width/2, titleY);
+            
+            ctx.font = '300 40px Plus Jakarta Sans';
+            ctx.fillStyle = 'rgba(255,255,255,0.6)';
+            ctx.fillText('SCAN TO ACCESS', canvas.width/2, titleY + 70);
+            ctx.globalAlpha = 1;
+
+            // 3. QR Cards Animation
+            // Card 1: Site QR (Slide in from left)
+            const card1Progress = Math.min(1, Math.max(0, (cycle - 0.5) * 2));
+            const card1X = (canvas.width / 2) - 500 + (card1Progress * 500);
+            const card1Tilt = -0.05 + Math.sin(time) * 0.01;
+            drawQRCard(ctx, state.siteImg, card1X, 750, 'WEBSITE', card1Tilt, card1Progress, state.primary);
+
+            // Card 2: WA QR (Slide in from right)
+            const card2Progress = Math.min(1, Math.max(0, (cycle - 0.8) * 2));
+            const card2X = (canvas.width / 2) + 500 - (card2Progress * 500);
+            const card2Tilt = 0.05 + Math.cos(time) * 0.01;
+            drawQRCard(ctx, state.waImg, card2X, 1250, 'WHATSAPP', card2Tilt, card2Progress, state.accent);
+
+            // 4. Footer Animation
+            const footerY = 1750 + Math.sin(time * 2) * 10;
+            const footerOpacity = Math.min(1, (cycle - 1.2) * 2);
+            ctx.globalAlpha = Math.max(0, footerOpacity);
+            ctx.font = 'bold 80px Plus Jakarta Sans';
+            ctx.fillStyle = state.accent;
+            ctx.fillText(state.number || "JOIN US NOW", canvas.width/2, footerY);
+            
+            ctx.font = 'bold 30px Plus Jakarta Sans';
+            ctx.fillStyle = 'rgba(255,255,255,0.4)';
+            ctx.fillText('AVAILABLE 24/7', canvas.width/2, footerY + 80);
+            ctx.globalAlpha = 1;
+
+            requestAnimationFrame(animate);
+        }
+
+        function drawBackground(ctx, time) {
+            ctx.fillStyle = '#020617';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Floating Orbs
+            const orb1X = canvas.width / 2 + Math.sin(time * 0.5) * 300;
+            const orb1Y = canvas.height / 2 + Math.cos(time * 0.5) * 400;
+            drawOrb(ctx, orb1X, orb1Y, 800, state.primary + '22');
+
+            const orb2X = canvas.width / 2 + Math.cos(time * 0.7) * 400;
+            const orb2Y = canvas.height / 2 + Math.sin(time * 0.7) * 500;
+            drawOrb(ctx, orb2X, orb2Y, 800, state.accent + '11');
+        }
+
+        function drawOrb(ctx, x, y, r, color) {
+            const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+            g.addColorStop(0, color);
+            g.addColorStop(1, 'transparent');
+            ctx.fillStyle = g;
+            ctx.beginPath();
+            ctx.arc(x, y, r, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function drawQRCard(ctx, img, x, y, label, rotation, opacity, accent) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(rotation);
+            ctx.globalAlpha = opacity;
+
+            // Glossy Card Background
+            ctx.shadowColor = 'rgba(0,0,0,0.5)';
+            ctx.shadowBlur = 60;
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+            roundRect(ctx, -220, -220, 440, 520, 50);
+            ctx.fill();
+
+            // Accent Bar
+            ctx.fillStyle = accent;
+            roundRect(ctx, -220, 240, 440, 60, {bl: 50, br: 50});
+            ctx.fill();
+
+            // Image
+            if (img) {
+                ctx.shadowBlur = 0;
+                ctx.drawImage(img, -180, -180, 360, 360);
+            } else {
+                ctx.strokeStyle = '#e2e8f0';
+                ctx.setLineDash([10, 10]);
+                ctx.strokeRect(-160, -160, 320, 320);
+                ctx.font = 'bold 30px Plus Jakarta Sans';
+                ctx.fillStyle = '#94a3b8';
+                ctx.textAlign = 'center';
+                ctx.fillText('UPLOAD QR', 0, 0);
+            }
+
+            // Label
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold 35px Plus Jakarta Sans';
+            ctx.fillText(label, 0, 282);
+
+            ctx.restore();
+            ctx.setLineDash([]);
+        }
+
+        function roundRect(ctx, x, y, width, height, radius) {
+            if (typeof radius === 'number') {
+                radius = {tl: radius, tr: radius, br: radius, bl: radius};
+            }
+            ctx.beginPath();
+            ctx.moveTo(x + radius.tl, y);
+            ctx.lineTo(x + width - radius.tr, y);
+            ctx.quadraticCurveTo(x + width, y, x + width, y + radius.tr);
+            ctx.lineTo(x + width, y + height - radius.br);
+            ctx.quadraticCurveTo(x + width, y + height, x + width - radius.br, y + height);
+            ctx.lineTo(x + radius.bl, y + height);
+            ctx.quadraticCurveTo(x, y + height, x, y + height - radius.bl);
+            ctx.lineTo(x, y + radius.tl);
+            ctx.quadraticCurveTo(x, y, x + radius.tl, y);
+            ctx.closePath();
+        }
+
+        // Export Functionality
+        document.getElementById('recordBtn').addEventListener('click', async () => {
+            const overlay = document.getElementById('recordingOverlay');
+            const progress = document.getElementById('recordProgress');
+            overlay.style.display = 'flex';
+            
+            // Restart cycle for clean start
+            state.startTime = Date.now();
+            
+            const stream = canvas.captureStream(60); // 60 FPS
+            const recorder = new MediaRecorder(stream, {
+                mimeType: 'video/webm;codecs=vp9',
+                videoBitsPerSecond: 5000000 // 5Mbps for high quality
+            });
+
+            const chunks = [];
+            recorder.ondataavailable = e => chunks.push(e.data);
+            recorder.onstop = async () => {
+                const blob = new Blob(chunks, { type: 'video/webm' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'reel-tail-animated.webm';
+                a.click();
+                overlay.style.display = 'none';
+            };
+
+            recorder.start();
+            
+            // Record for exactly 5 seconds
+            let p = 0;
+            const interval = setInterval(() => {
+                p += 2;
+                progress.style.width = p + '%';
+                if (p >= 100) {
+                    clearInterval(interval);
+                    recorder.stop();
+                }
+            }, 100);
+        });
+
+        // Initialize
+        window.onload = animate;
+    </script>
+</body>
+</html>
